@@ -23,6 +23,7 @@ namespace OxPt
     public class DaTests
     {
         [Theory]
+        [InlineData("TestWithMultipleDocuments.docx", "DA-Data.xml", true)]
         [InlineData("DA001-TemplateDocument.docx", "DA-Data.xml", false)]
         [InlineData("DA002-TemplateDocument.docx", "DA-DataNotHighValueCust.xml", false)]
         [InlineData("DA003-Select-XPathFindsNoData.docx", "DA-Data.xml", true)]
@@ -116,7 +117,10 @@ namespace OxPt
         [InlineData("DA264-InvalidRunLevelRepeat.docx", "DA-Data.xml", true)]
         [InlineData("DA265-RunLevelRepeatWithWhiteSpaceBefore.docx", "DA-Data.xml", false)]
         [InlineData("DA266-RunLevelRepeat-NoData.docx", "DA-Data.xml", true)]
-        
+
+
+
+
         public void DA101(string name, string data, bool err)
         {
             DirectoryInfo sourceDir = new DirectoryInfo("../../../../TestFiles/");
@@ -154,6 +158,63 @@ namespace OxPt
             }
 
             Assert.Equal(err, returnedTemplateError);
+        }
+        [Fact]
+        public void TestWithMultipleDocuments()
+        {
+            List<string> templateNames = new List<string>()
+            {
+                "Document 1.docx",
+                 "Document 2.docx"
+            };
+            string dataFileNames = "data.xml";
+            bool expectedErrors =false;
+            // Call the DA1001 method with the prepared lists
+            DA1001(templateNames, dataFileNames, expectedErrors);
+        }
+
+        public void DA1001(List<string> templateNames, string dataFiles, bool expectedErrors)
+        {
+            if (templateNames.Count < 0)
+            {
+                throw new Exception("The number of template files, data files, and expected errors must match.");
+            }
+            DirectoryInfo sourceDir = new DirectoryInfo(@"C:\\Files\");
+            //DirectoryInfo sourceDir = new DirectoryInfo("../../../../TestFiles/");
+            for (int i = 0; i < templateNames.Count; i++)
+            {
+                string name = templateNames[i];
+                string data = dataFiles;
+                bool err = expectedErrors;
+                FileInfo templateDocx = new FileInfo(Path.Combine(sourceDir.FullName, name));
+                FileInfo dataFile = new FileInfo(Path.Combine(sourceDir.FullName, data));
+                WmlDocument wmlTemplate = new WmlDocument(templateDocx.FullName);
+                XElement xmldata = XElement.Load(dataFile.FullName);
+                bool returnedTemplateError;
+                WmlDocument afterAssembling = DocumentAssembler.AssembleDocument(wmlTemplate, xmldata, out returnedTemplateError);
+                var assembledDocx = new FileInfo(Path.Combine(TestUtil.TempDir.FullName, templateDocx.Name.Replace(".docx", "-processed-by-DocumentAssembler.docx")));
+                afterAssembling.SaveAs(assembledDocx.FullName);
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    ms.Write(afterAssembling.DocumentByteArray, 0, afterAssembling.DocumentByteArray.Length);
+                    using (WordprocessingDocument wDoc = WordprocessingDocument.Open(ms, true))
+                    {
+                        OpenXmlValidator v = new OpenXmlValidator();
+                        var valErrors = v.Validate(wDoc).Where(ve => !s_ExpectedErrors.Contains(ve.Description));
+#if false
+                    StringBuilder sb = new StringBuilder();
+                    foreach (var item in valErrors.Select(r => r.Description).OrderBy(t => t).Distinct())
+	                {
+		                sb.Append(item).Append(Environment.NewLine);
+	                }
+                    string z = sb.ToString();
+                    Console.WriteLine(z);
+#endif
+                        Assert.Empty(valErrors);
+                    }
+                }
+                Assert.Equal(err, returnedTemplateError);
+            }
         }
 
         [Theory]

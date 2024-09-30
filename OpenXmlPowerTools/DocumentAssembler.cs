@@ -48,7 +48,33 @@ namespace OpenXmlPowerTools
                 return assembledDocument;
             }
         }
-
+        public static List<WmlDocument> AssembleDocuments(List<WmlDocument> templateDocument, XElement data, out bool templateError)
+        {
+            var assemledDocuments = new List<WmlDocument>();
+            templateError = false;
+            foreach (var templateDoc in templateDocument)
+            {
+                byte[] byteArray = templateDoc.DocumentByteArray;
+                using (MemoryStream mem = new MemoryStream())
+                {
+                    mem.Write(byteArray, 0, (int)byteArray.Length);
+                    using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(mem, true))
+                    {
+                        if (RevisionAccepter.HasTrackedRevisions(wordDoc))
+                            throw new OpenXmlPowerToolsException("Invalid DocumentAssembler template - contains tracked revisions");
+                        var te = new TemplateError();
+                        foreach (var part in wordDoc.ContentParts())
+                        {
+                            ProcessTemplatePart(data, te, part);
+                        }
+                        templateError = te.HasError || templateError;
+                    }
+                    WmlDocument assembledDocument = new WmlDocument("Processd-" + templateDoc.FileName, mem.ToArray());
+                    assemledDocuments.Add(assembledDocument);
+                }
+            }
+            return assemledDocuments;
+        }
         private static void ProcessTemplatePart(XElement data, TemplateError te, OpenXmlPart part)
         {
             XDocument xDoc = part.GetXDocument();
