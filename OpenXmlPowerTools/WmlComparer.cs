@@ -93,6 +93,46 @@ namespace OpenXmlPowerTools
             return CompareInternal(source1, source2, settings, true);
         }
 
+        public static WmlDocument CompareMultiple(List<WmlDocument> documents, WmlComparerSettings settings)
+        {
+            //DirectoryInfo sourceDir = new DirectoryInfo("../../../../TestFiles/");
+            
+            if (documents == null || documents.Count < 2)
+            {
+                throw new ArgumentNullException("At least two documents are required for comparison.");
+            }
+            WmlDocument result = CompareInternal(documents[0], documents[1], settings, true);
+            for (int i = 2; i < documents.Count; i++)
+            {
+                result = CompareInternal(result, documents[i], settings, true);
+            }
+            //string outputPath = Path.Combine(sourceDir.FullName, "ComparisonResult.docx");
+            //SaveResultToFile(result, outputPath);
+            return result;
+        }
+        public static void SaveResultToFile(WmlDocument document, string outputPath)
+        {
+            // Create a new Wordprocessing document
+            using (WordprocessingDocument wordDoc = WordprocessingDocument.Create(outputPath, DocumentFormat.OpenXml.WordprocessingDocumentType.Document))
+            {
+                // Add a main document part
+                var mainPart = wordDoc.AddMainDocumentPart();
+                // Write the XML content from the WmlDocument to the main document part
+                using (var ms = new MemoryStream())
+                {
+                    // Get the main document part's XML content
+                    var xmlContent = document.MainDocumentPart; // This assumes you have access to the document's XML content directly
+                                                                // Write the XML content to the memory stream
+                    using (var writer = new StreamWriter(ms))
+                    {
+                        writer.Write(xmlContent);
+                        writer.Flush();
+                        ms.Position = 0; // Reset stream position
+                        mainPart.FeedData(ms);
+                    }
+                }
+            }
+        }
         private static WmlDocument CompareInternal(WmlDocument source1, WmlDocument source2, WmlComparerSettings settings,
             bool preProcessMarkupInOriginal)
         {
